@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Mimi Clicker — косточковая ферма</title>
+<meta name="description" content="Милый кликер про Мими: гладь её, собирай косточки и открывай улучшения.">
+<meta name="theme-color" content="#1a100d">
+<meta name="color-scheme" content="dark">
+<link rel="icon" href="assets/favicon.png" type="image/png">
+<link rel="preload" as="image" href="assets/mimi-hero.webp">
+<link rel="stylesheet" href="fonts.css">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<div class="bg" aria-hidden="true">
+  <span class="bg__blob bg__blob--1"></span>
+  <span class="bg__blob bg__blob--2"></span>
+  <span class="bg__blob bg__blob--3"></span>
+  <span class="bg__vignette"></span>
+  <span class="bg__grain"></span>
+</div>
+
+<svg class="sprite" aria-hidden="true" focusable="false" width="0" height="0">
+  <symbol id="i-bone" viewBox="0 0 24 24">
+    <g transform="rotate(-24 12 12)" fill="currentColor">
+      <rect x="5.6" y="10" width="12.8" height="4" rx="2"/>
+      <circle cx="5.1" cy="8.6" r="3"/><circle cx="5.1" cy="15.4" r="3"/>
+      <circle cx="18.9" cy="8.6" r="3"/><circle cx="18.9" cy="15.4" r="3"/>
+    </g>
+  </symbol>
+  <symbol id="i-paw" viewBox="0 0 24 24">
+    <g fill="currentColor">
+      <ellipse cx="12" cy="15.6" rx="5.3" ry="4.4"/>
+      <ellipse cx="6.1" cy="10.6" rx="2.25" ry="2.9" transform="rotate(-20 6.1 10.6)"/>
+      <ellipse cx="9.9" cy="7.2" rx="2.15" ry="2.9" transform="rotate(-8 9.9 7.2)"/>
+      <ellipse cx="14.1" cy="7.2" rx="2.15" ry="2.9" transform="rotate(8 14.1 7.2)"/>
+      <ellipse cx="17.9" cy="10.6" rx="2.25" ry="2.9" transform="rotate(20 17.9 10.6)"/>
+    </g>
+  </symbol>
+  <symbol id="i-heart" viewBox="0 0 24 24">
+    <path fill="currentColor" d="M12 21s-7.2-4.6-9.3-8.6A5.4 5.4 0 0 1 12 6.4a5.4 5.4 0 0 1 9.3 6C19.2 16.4 12 21 12 21Z"/>
+  </symbol>
+  <symbol id="i-spark" viewBox="0 0 24 24">
+    <path fill="currentColor" d="M12 2.2 14.3 9l6.8 2.3-6.8 2.3L12 21.4l-2.3-7.8L2.9 11.3 9.7 9 12 2.2Z"/>
+  </symbol>
+  <symbol id="i-volume" viewBox="0 0 24 24">
+    <path fill="currentColor" d="M11.2 4.9 6.8 8.7H3.6c-.8 0-1.4.6-1.4 1.4v3.8c0 .8.6 1.4 1.4 1.4h3.2l4.4 3.8c.6.5 1.4.1 1.4-.7V5.6c0-.8-.8-1.2-1.4-.7Z"/>
+    <path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" d="M15.6 8.7a4.7 4.7 0 0 1 0 6.6M18.2 6.1a8.4 8.4 0 0 1 0 11.8"/>
+  </symbol>
+  <symbol id="i-muted" viewBox="0 0 24 24">
+    <path fill="currentColor" d="M11.2 4.9 6.8 8.7H3.6c-.8 0-1.4.6-1.4 1.4v3.8c0 .8.6 1.4 1.4 1.4h3.2l4.4 3.8c.6.5 1.4.1 1.4-.7V5.6c0-.8-.8-1.2-1.4-.7Z"/>
+    <path fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" d="m16.2 9.4 4.6 5.2M20.8 9.4l-4.6 5.2"/>
+  </symbol>
+  <symbol id="i-chart" viewBox="0 0 24 24">
+    <g fill="currentColor">
+      <rect x="3" y="13" width="4" height="8" rx="1.6"/><rect x="10" y="8" width="4" height="13" rx="1.6"/><rect x="17" y="3" width="4" height="18" rx="1.6"/>
+    </g>
+  </symbol>
+  <symbol id="i-trophy" viewBox="0 0 24 24">
+    <path fill="currentColor" d="M8 3h8v2.2h3.2v2.4c0 2.6-1.9 4.7-4.4 5.1a5.6 5.6 0 0 1-1.6 2.4V18h3.4c.6 0 1 .4 1 1v1.6H6.4V19c0-.6.4-1 1-1H10.8v-2.9a5.6 5.6 0 0 1-1.7-2.4C6.7 12.3 4.8 10.2 4.8 7.6V5.2H8V3Zm8 4.2v4.7c1.3-.4 2.2-1.6 2.2-3V7.2H16ZM8 7.2H5.8v1.7c0 1.4.9 2.6 2.2 3V7.2Z"/>
+  </symbol>
+  <symbol id="i-close" viewBox="0 0 24 24">
+    <path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M6 6l12 12M18 6 6 18"/>
+  </symbol>
+  <symbol id="i-bolt" viewBox="0 0 24 24">
+    <path fill="currentColor" d="M13.6 2 5 13.4h5.2L9.4 22 19 10.2h-5.6L13.6 2Z"/>
+  </symbol>
+  <symbol id="i-moon" viewBox="0 0 24 24">
+    <path fill="currentColor" d="M20.5 14.7A8.6 8.6 0 0 1 9.3 3.5a8.8 8.8 0 1 0 11.2 11.2Z"/>
+  </symbol>
+</svg>
+
+<div class="app">
+
+  <header class="topbar">
+    <div class="brand">
+      <span class="brand__badge">
+        <img src="assets/mimi-bust.webp" alt="" width="96" height="96" decoding="async">
+      </span>
+      <div class="brand__text">
+        <h1>Mimi Clicker</h1>
+        <p>косточковая ферма</p>
+      </div>
+    </div>
+
+    <div class="topbar__actions">
+      <button class="icon-btn" id="btn-sound" type="button" aria-pressed="true" aria-label="Звук: включён" title="Звук">
+        <svg class="icon" id="icon-sound"><use href="#i-volume"/></svg>
+      </button>
+      <button class="icon-btn" id="btn-stats" type="button" aria-label="Статистика и достижения" title="Статистика">
+        <svg class="icon"><use href="#i-chart"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <main class="layout">
+
+    <section class="panel stats" aria-label="Статистика">
+      <div class="score">
+        <span class="score__label">Косточки</span>
+        <div class="score__value">
+          <svg class="icon score__icon"><use href="#i-bone"/></svg>
+          <span id="score" aria-live="off">0</span>
+        </div>
+        <div class="score__rate">
+          <svg class="icon"><use href="#i-paw"/></svg>
+          <span id="rate">0</span><span class="score__rate-unit">в секунду</span>
+        </div>
+      </div>
+
+      <div class="combo" id="combo-box">
+        <div class="combo__head">
+          <span>Комбо</span>
+          <b id="combo-mult">x1,0</b>
+        </div>
+        <div class="combo__bar"><i id="combo-fill"></i></div>
+        <p class="combo__hint">Кликай чаще — множитель растёт</p>
+      </div>
+
+      <div class="minis">
+        <div class="mini"><span>За клик</span><b id="per-click">1</b></div>
+        <div class="mini"><span>Крит</span><b id="crit-chance">5%</b></div>
+        <div class="mini"><span>Крит ×</span><b id="crit-mult">8</b></div>
+        <div class="mini"><span>Бонус</span><b id="multiplier">x1</b></div>
+      </div>
+
+      <div class="goal" id="goal">
+        <div class="goal__head">
+          <span>Следующая цель</span>
+          <b id="goal-progress">0 / 15</b>
+        </div>
+        <div class="goal__name">
+          <span class="goal__icon" id="goal-icon" aria-hidden="true">🐾</span>
+          <span id="goal-name">Мягкая лапка</span>
+        </div>
+        <div class="goal__bar"><i id="goal-fill"></i></div>
+      </div>
+
+      <div class="bonus-note" id="bonus-note">
+        <span class="bonus-note__orb" aria-hidden="true">
+          <svg class="icon"><use href="#i-spark"/></svg>
+        </span>
+        <div class="bonus-note__text">
+          <b>Золотая косточка</b>
+          <span id="bonus-state">появится случайно</span>
+        </div>
+      </div>
+
+      <div class="frenzy" id="frenzy" hidden>
+        <svg class="icon"><use href="#i-bolt"/></svg>
+        <span>Безумие ×7</span>
+        <b id="frenzy-time">15с</b>
+      </div>
+
+      <div class="ach-progress">
+        <svg class="icon"><use href="#i-trophy"/></svg>
+        <span>Достижения</span>
+        <b id="ach-count">0/15</b>
+        <em id="ach-bonus">+0%</em>
+      </div>
+    </section>
+
+    <section class="stage" id="stage" aria-label="Мими">
+      <div class="deco" aria-hidden="true">
+        <svg class="deco__item" style="--x:9%;--dur:22s;--delay:-3s;--size:20px"><use href="#i-heart"/></svg>
+        <svg class="deco__item" style="--x:21%;--dur:27s;--delay:-14s;--size:14px"><use href="#i-bone"/></svg>
+        <svg class="deco__item" style="--x:78%;--dur:24s;--delay:-7s;--size:17px"><use href="#i-paw"/></svg>
+        <svg class="deco__item" style="--x:90%;--dur:30s;--delay:-19s;--size:22px"><use href="#i-heart"/></svg>
+        <svg class="deco__item" style="--x:15%;--dur:34s;--delay:-24s;--size:12px"><use href="#i-spark"/></svg>
+        <svg class="deco__item" style="--x:86%;--dur:20s;--delay:-10s;--size:13px"><use href="#i-spark"/></svg>
+      </div>
+      <div class="stage__halo" aria-hidden="true"></div>
+      <div class="stage__orbit" aria-hidden="true"></div>
+      <div class="stage__floor" aria-hidden="true"></div>
+
+      <button class="mimi" id="mimi-btn" type="button" aria-label="Погладить Мими и получить косточку">
+        <span class="mimi__bob">
+          <img class="mimi__img" id="mimi-img" src="assets/mimi-hero.webp" width="458" height="1000"
+               alt="Мими — милая собачка-девочка с шоколадными волосами в белой футболке" draggable="false">
+        </span>
+      </button>
+
+      <p class="speech" id="speech" role="status" aria-live="polite"></p>
+
+      <button class="golden" id="golden" type="button" hidden aria-label="Поймать золотую косточку">
+        <svg class="icon"><use href="#i-bone"/></svg>
+      </button>
+
+      <div class="fx" id="fx" aria-hidden="true"></div>
+
+      <p class="stage__hint">
+        <span class="hint--desktop"><kbd>Пробел</kbd> или клик — погладить</span>
+        <span class="hint--touch">Тапни по Мими, чтобы погладить</span>
+      </p>
+    </section>
+
+    <section class="panel shop" aria-label="Магазин улучшений">
+      <div class="shop__head">
+        <h2>Улучшения</h2>
+        <span class="shop__badge" id="shop-badge">12</span>
+      </div>
+      <div class="shop__list" id="shop-list"></div>
+      <div class="shop__tip">
+        <img src="assets/mimi-chibi.webp" alt="" width="64" height="65" loading="lazy" decoding="async">
+        <p>Совет: держи серию кликов — комбо даёт до <b>×3</b> косточек.</p>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<div class="modal" id="modal" hidden>
+  <div class="modal__backdrop" data-close></div>
+  <div class="modal__card" role="dialog" aria-modal="true" aria-labelledby="modal-title" tabindex="-1">
+    <header class="modal__head">
+      <h2 id="modal-title">Дневник Мими</h2>
+      <button class="icon-btn" type="button" data-close aria-label="Закрыть">
+        <svg class="icon"><use href="#i-close"/></svg>
+      </button>
+    </header>
+    <div class="modal__body" id="modal-body"></div>
+    <footer class="modal__actions">
+      <p>Каждое достижение даёт <b>+2%</b> к доходу.<br>Прогресс сохраняется автоматически.</p>
+      <button class="btn btn--danger" type="button" id="reset-btn">Сбросить прогресс</button>
+    </footer>
+  </div>
+</div>
+
+<div class="toasts" id="toasts" role="status" aria-live="polite"></div>
+
+<noscript>
+  <p class="noscript">Для игры нужен JavaScript — включи его, пожалуйста 🐾</p>
+</noscript>
+
+<script src="game.js"></script>
+</body>
+</html>
