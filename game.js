@@ -1,6 +1,7 @@
 /* ============================================================
    Mimi Clicker — game logic
-   Vanilla JS, no dependencies. Progress is stored in localStorage.
+   Two characters, two independent saves, one shared economy.
+   Vanilla JS, no dependencies. Progress lives in localStorage.
    ============================================================ */
 
 (() => {
@@ -54,57 +55,145 @@
     }
   }
 
-  /* ---------------- content ---------------- */
+  /* ---------------- economy ---------------- */
 
+  const ECONOMY = {
+    baseCrit: 0.05,
+    baseCritMult: 8,
+    critCap: 0.75,
+    achBonus: 0.02,
+    frenzyMult: 7,
+    frenzyMs: 15000,
+    offlineRate: 0.7,
+    offlineCap: 8 * 3600,
+    comboWindow: 1600,
+    comboStep: 0.035,
+    comboMax: 60,
+  };
+
+  // Balanced over hours, not minutes: see README for the progression curve.
   const UPGRADES = [
-    { id: 'paw',     icon: '🐾', name: 'Мягкая лапка',     desc: '+1 к силе клика',         cost: 15,     growth: 1.15, kind: 'clickAdd', value: 1,    tint: '#e9a285' },
-    { id: 'tail',    icon: '🐕', name: 'Хвостик-помощник', desc: '+0,4 косточки в секунду', cost: 50,     growth: 1.18, kind: 'cpsAdd',   value: 0.4,  tint: '#d9a26c' },
-    { id: 'treat',   icon: '🦴', name: 'Любимая косточка', desc: '+3 к силе клика',         cost: 160,    growth: 1.16, kind: 'clickAdd', value: 3,    tint: '#f0dfc0' },
-    { id: 'collar',  icon: '🎀', name: 'Ошейник с костью', desc: '+3% к шансу крита',       cost: 240,    growth: 1.36, kind: 'critAdd',  value: 0.03, max: 15, tint: '#aacbe0' },
-    { id: 'pack',    icon: '🐶', name: 'Стайка Мими',      desc: '+3 косточки в секунду',   cost: 900,    growth: 1.19, kind: 'cpsAdd',   value: 3,    tint: '#e0b07a' },
-    { id: 'socks',   icon: '🧦', name: 'Тёплые носочки',   desc: '+15% ко всему доходу',    cost: 1500,   growth: 1.4,  kind: 'globMul',  value: 1.15, tint: '#c78f75' },
-    { id: 'fang',    icon: '🦷', name: 'Критический укус', desc: '+3 к множителю крита',    cost: 2600,   growth: 1.42, kind: 'critMul',  value: 3,    tint: '#e7e2d6' },
-    { id: 'moon',    icon: '🌙', name: 'Лунная косточка',  desc: '+40% к силе клика',       cost: 12000,  growth: 1.36, kind: 'clickMul', value: 1.4,  tint: '#b9c9e6' },
-    { id: 'vault',   icon: '🏦', name: 'Костехранилище',   desc: '+30 косточек в секунду',  cost: 14000,  growth: 1.2,  kind: 'cpsAdd',   value: 30,   tint: '#d8b98c' },
-    { id: 'factory', icon: '🏭', name: 'Фабрика костей',   desc: '+240 косточек в секунду', cost: 42000,  growth: 1.21, kind: 'cpsAdd',   value: 240,  tint: '#c9a07f' },
-    { id: 'love',    icon: '💖', name: 'Генератор любви',  desc: '+25% ко всему доходу',    cost: 90000,  growth: 1.44, kind: 'globMul',  value: 1.25, tint: '#ef9a8a' },
-    { id: 'star',    icon: '🌟', name: 'Звезда Мими',      desc: '+2000 косточек в секунду', cost: 260000, growth: 1.22, kind: 'cpsAdd',   value: 2000, tint: '#f5cd7a' },
+    { id: 'paw',     kind: 'clickAdd',   value: 1,    base: 15,     growth: 1.16, icon: '🐾', name: 'Мягкая лапка',     desc: '+1 к силе клика',           tint: '#e9a285' },
+    { id: 'tail',    kind: 'cpsAdd',     value: 0.6,  base: 120,    growth: 1.17, icon: '🐕', name: 'Хвостик-помощник', desc: '+0,6 косточки в секунду',   tint: '#d9a26c' },
+    { id: 'treat',   kind: 'clickAdd',   value: 6,    base: 700,    growth: 1.19, icon: '🦴', name: 'Любимая косточка', desc: '+6 к силе клика',           tint: '#f0dfc0' },
+    { id: 'collar',  kind: 'critAdd',    value: 0.025, base: 1500,  growth: 1.40, icon: '🎀', name: 'Ошейник с костью', desc: '+2,5% к шансу крита',       tint: '#aacbe0', max: 12 },
+    { id: 'pack',    kind: 'cpsAdd',     value: 12,   base: 6000,   growth: 1.20, icon: '🐶', name: 'Стайка Мими',      desc: '+12 косточек в секунду',    tint: '#e0b07a' },
+    { id: 'socks',   kind: 'globMul',    value: 1.10, base: 20000,  growth: 1.55, icon: '🧦', name: 'Тёплые носочки',   desc: '×1,10 ко всему доходу',     tint: '#c78f75' },
+    { id: 'fang',    kind: 'critMul',    value: 3,    base: 30000,  growth: 1.50, icon: '🦷', name: 'Критический укус', desc: '+3 к множителю крита',      tint: '#e7e2d6' },
+    { id: 'vault',   kind: 'cpsAdd',     value: 150,  base: 120000, growth: 1.21, icon: '🏦', name: 'Костехранилище',   desc: '+150 косточек в секунду',   tint: '#d8b98c' },
+    { id: 'moon',    kind: 'clickBonus', value: 0.35, base: 200000, growth: 1.45, icon: '🌙', name: 'Лунная косточка',   desc: '+35% к силе клика',         tint: '#b9c9e6' },
+    { id: 'factory', kind: 'cpsAdd',     value: 1500, base: 900000, growth: 1.22, icon: '🏭', name: 'Фабрика костей',   desc: '+1 500 косточек в секунду', tint: '#c9a07f' },
+    { id: 'love',    kind: 'globMul',    value: 1.15, base: 2.5e6,  growth: 1.60, icon: '💖', name: 'Генератор любви',  desc: '×1,15 ко всему доходу',     tint: '#ef9a8a' },
+    { id: 'star',    kind: 'cpsAdd',     value: 25000, base: 2e7,   growth: 1.23, icon: '🌟', name: 'Звезда Мими',      desc: '+25 000 косточек в секунду', tint: '#f5cd7a' },
   ];
 
   const ACHIEVEMENTS = [
-    { id: 'first',   icon: '🦴', name: 'Первая косточка',   desc: 'Собери первую косточку',        test: () => S.totalBones >= 1 },
-    { id: 'k1000',   icon: '💰', name: 'Тысяча',            desc: 'Собери 1 000 косточек',         test: () => S.totalBones >= 1e3 },
-    { id: 'k100k',   icon: '💎', name: 'Богатая Мими',      desc: 'Собери 100 000 косточек',       test: () => S.totalBones >= 1e5 },
-    { id: 'km',      icon: '👑', name: 'Косточковый магнат', desc: 'Собери 1 000 000 косточек',     test: () => S.totalBones >= 1e6 },
-    { id: 'clicks100', icon: '👆', name: 'Сотня',           desc: 'Погладь Мими 100 раз',          test: () => S.clicks >= 100 },
-    { id: 'clicks1k',  icon: '✋', name: 'Тысяча поглаживаний', desc: 'Погладь Мими 1 000 раз',    test: () => S.clicks >= 1000 },
-    { id: 'combo25', icon: '🔥', name: 'В ритме',           desc: 'Серия из 25 кликов подряд',     test: () => S.bestCombo >= 25 },
-    { id: 'combo60', icon: '⚡', name: 'Не остановить',     desc: 'Серия из 60 кликов подряд',     test: () => S.bestCombo >= 60 },
-    { id: 'crit1',   icon: '💥', name: 'Критический укус',  desc: 'Нанеси первый крит',            test: () => S.crits >= 1 },
-    { id: 'crit100', icon: '🦷', name: 'Зубастая',          desc: 'Нанеси 100 критов',             test: () => S.crits >= 100 },
-    { id: 'buy1',    icon: '🛍️', name: 'Первая покупка',   desc: 'Купи любое улучшение',          test: () => totalLevels() >= 1 },
-    { id: 'buy25',   icon: '🎁', name: 'Коллекционер',      desc: 'Купи 25 улучшений',             test: () => totalLevels() >= 25 },
-    { id: 'cps10',   icon: '🤖', name: 'Автопомощь',        desc: '10 косточек в секунду',         test: () => D.cps >= 10 },
-    { id: 'cps100',  icon: '🏭', name: 'Ферма костей',      desc: '100 косточек в секунду',        test: () => D.cps >= 100 },
-    { id: 'golden1', icon: '✨', name: 'Золотая удача',     desc: 'Поймай золотую косточку',       test: () => S.goldens >= 1 },
+    { id: 'first',     icon: '🦴', name: 'Первая косточка',     desc: 'Собери первую косточку',       test: () => S.totalBones >= 1 },
+    { id: 'k1000',     icon: '💰', name: 'Тысяча',              desc: 'Собери 1 000 косточек',        test: () => S.totalBones >= 1e3 },
+    { id: 'k100k',     icon: '💎', name: 'Богатая Мими',        desc: 'Собери 100 000 косточек',      test: () => S.totalBones >= 1e5 },
+    { id: 'km',        icon: '👑', name: 'Косточковый магнат',  desc: 'Собери 1 000 000 косточек',    test: () => S.totalBones >= 1e6 },
+    { id: 'clicks100', icon: '👆', name: 'Сотня',               desc: 'Погладь 100 раз',              test: () => S.clicks >= 100 },
+    { id: 'clicks1k',  icon: '✋', name: 'Тысяча поглаживаний', desc: 'Погладь 1 000 раз',            test: () => S.clicks >= 1000 },
+    { id: 'combo25',   icon: '🔥', name: 'В ритме',             desc: 'Серия из 25 кликов подряд',    test: () => S.bestCombo >= 25 },
+    { id: 'combo60',   icon: '⚡', name: 'Не остановить',       desc: 'Серия из 60 кликов подряд',    test: () => S.bestCombo >= 60 },
+    { id: 'crit1',     icon: '💥', name: 'Критический укус',    desc: 'Нанеси первый крит',           test: () => S.crits >= 1 },
+    { id: 'crit100',   icon: '🦷', name: 'Зубастая',            desc: 'Нанеси 100 критов',            test: () => S.crits >= 100 },
+    { id: 'buy1',      icon: '🛍️', name: 'Первая покупка',     desc: 'Купи любое улучшение',         test: () => totalLevels() >= 1 },
+    { id: 'buy25',     icon: '🎁', name: 'Коллекционер',        desc: 'Купи 25 улучшений',            test: () => totalLevels() >= 25 },
+    { id: 'cps10',     icon: '🤖', name: 'Автопомощь',          desc: '10 косточек в секунду',        test: () => D.cps >= 10 },
+    { id: 'cps100',    icon: '🏭', name: 'Ферма костей',        desc: '100 косточек в секунду',       test: () => D.cps >= 100 },
+    { id: 'golden1',   icon: '✨', name: 'Золотая удача',       desc: 'Поймай золотую косточку',      test: () => S.goldens >= 1 },
   ];
 
-  const SPEECH = [
-    'Мими рада!', 'Ещё косточку?', 'Хвостик виляет сам собой!', 'Ты лучший!',
-    'Гав-гав!', 'Погладь ещё!', 'У меня лапки, но я стараюсь', 'Косточки — это любовь',
-    'Ням-ням!', 'Ты меня засмущал…', 'Смотри, какой хвостик!', 'Ещё чуть-чуть — и покупка!',
-    'Мими тебя любит', 'Не останавливайся!', 'Тёплые носочки — это уют',
+  /* ---------------- characters ---------------- */
+
+  const CHARACTERS = [
+    {
+      id: 'mimi',
+      name: 'Мими',
+      dative: 'Мими',
+      brand: 'Mimi Clicker',
+      tagline: 'косточковая ферма',
+      diary: 'Дневник Мими',
+      pet: 'Погладить Мими и получить косточку',
+      alt: 'Мими — милая собачка-девочка с шоколадными волосами в белой футболке',
+      hero: 'assets/mimi-hero.webp',
+      face: 'assets/mimi-face.webp',
+      chibi: 'assets/mimi-chibi.webp',
+      favicon: 'assets/favicon.png',
+      badgeIcon: '🐾',
+      themeColor: '#1a100d',
+      tip: 'Совет: держи серию кликов — комбо даёт до <b>×3</b> косточек.',
+      welcome: 'Привет! Погладь меня 🐾',
+      welcomeBack: 'С возвращением! 🐾',
+      goldenWin: 'Целое сокровище! 💛',
+      frenzySay: 'Безумие! ×7 на 15 секунд! ⚡',
+      comboLine: (m) => `Комбо ×${m}! 🔥`,
+      speech: [
+        'Мими рада!', 'Ещё косточку?', 'Хвостик виляет сам собой!', 'Ты лучший!',
+        'Гав-гав!', 'Погладь ещё!', 'У меня лапки, но я стараюсь', 'Косточки — это любовь',
+        'Ням-ням!', 'Ты меня засмущал…', 'Смотри, какой хвостик!', 'Ещё чуть-чуть — и покупка!',
+        'Мими тебя любит', 'Не останавливайся!', 'Тёплые носочки — это уют',
+      ],
+      buy: ['Новая штука!', 'Теперь я ещё сильнее!', 'Спасибо!', 'Это мне?', 'Мими довольна!'],
+      crit: ['Крит! 💥', 'Кусь!', 'Вот это удар!'],
+      flavor: null,
+    },
+    {
+      id: 'lapa',
+      name: 'Лапа',
+      dative: 'Лапе',
+      brand: 'Lapa Clicker',
+      tagline: 'дворовая банда',
+      diary: 'Дневник Лапы',
+      pet: 'Погладить Лапу и получить косточку',
+      alt: 'Лапа — чёрно-белая собака-девушка в чёрном худи',
+      hero: 'assets/lapa-hero.webp',
+      face: 'assets/lapa-face.webp',
+      chibi: 'assets/lapa-chibi.webp',
+      favicon: 'assets/lapa-favicon.png',
+      badgeIcon: '🐺',
+      themeColor: '#0a0a0c',
+      tip: 'Совет: не отпускай серию. Комбо — до <b>×3</b>. Как и всё хорошее.',
+      welcome: 'Чего уставился? Кликай.',
+      welcomeBack: 'Явился. Продолжай.',
+      goldenWin: 'О. Косточка.',
+      frenzySay: 'Семь. Пятнадцать секунд. Погнали.',
+      comboLine: (m) => `×${m}. Неплохо.`,
+      speech: [
+        'bruh', 'Ну?', 'Опять кликаешь?', 'Ладно. Ещё раз.', 'Не трогай уши.',
+        'Хвост не трогать.', 'Я не милая.', 'Пятна не отстирываются.', 'Кофе не будет.',
+        'Ты серьёзно?', 'Гав. Доволен?', 'Ещё одну — и спать.', 'Тише.', 'Убери руку.',
+        'Нормально.', 'Медленно. Но идёт.',
+      ],
+      buy: ['Ладно, сойдёт.', 'Полезно.', 'Уже лучше.', 'Хм.', 'Неплохо.', 'Держи.'],
+      crit: ['Кусь.', 'Больнее.', 'Вот так.', 'Укус.'],
+      flavor: {
+        paw:     { name: 'Лапа с когтями',   desc: '+1 к силе клика',           icon: '🐾', tint: '#e6e6ec' },
+        tail:    { name: 'Хвост-метроном',   desc: '+0,6 косточки в секунду',   icon: '🐕', tint: '#b9b9c4' },
+        treat:   { name: 'Сушёная косточка', desc: '+6 к силе клика',           icon: '🦴', tint: '#dcdce4' },
+        collar:  { name: 'Шипастый ошейник', desc: '+2,5% к шансу крита',       icon: '⛓️', tint: '#d98c9c' },
+        pack:    { name: 'Свора',            desc: '+12 косточек в секунду',    icon: '🐺', tint: '#a9a9b6' },
+        socks:   { name: 'Чёрные гольфы',    desc: '×1,10 ко всему доходу',     icon: '🧦', tint: '#9a9aa6' },
+        fang:    { name: 'Клык',             desc: '+3 к множителю крита',      icon: '🦷', tint: '#f0f0f4' },
+        vault:   { name: 'Схрон',            desc: '+150 косточек в секунду',   icon: '🏚️', tint: '#8f8f9c' },
+        moon:    { name: 'Ночная прогулка',  desc: '+35% к силе клика',         icon: '🌙', tint: '#b6b6c4' },
+        factory: { name: 'Костезавод',       desc: '+1 500 косточек в секунду', icon: '🏭', tint: '#7f7f8c' },
+        love:    { name: 'Доверие',          desc: '×1,15 ко всему доходу',     icon: '🖤', tint: '#c9c9d2' },
+        star:    { name: 'Легенда двора',    desc: '+25 000 косточек в секунду', icon: '⭐', tint: '#f2f2f6' },
+      },
+    },
   ];
 
-  const BUY_SPEECH = ['Новая штука!', 'Теперь я ещё сильнее!', 'Спасибо!', 'Это мне?', 'Мими довольна!'];
+  const characterById = (id) => CHARACTERS.find((c) => c.id === id) || CHARACTERS[0];
 
   /* ---------------- state ---------------- */
 
-  const SAVE_KEY = 'mimi-clicker.save.v1';
+  const SAVE_KEY = 'mimi-clicker.save.v2';
+  const LEGACY_KEY = 'mimi-clicker.save.v1';
 
   function defaultState() {
     return {
-      v: 1,
       bones: 0,
       totalBones: 0,
       clicks: 0,
@@ -113,15 +202,16 @@
       bestCombo: 0,
       levels: {},
       ach: [],
-      sound: true,
       playMs: 0,
       lastSeen: Date.now(),
       frenzyUntil: 0,
     };
   }
 
-  let S = defaultState();
-  let D = { click: 1, cps: 0, crit: 0.05, critMult: 8, glob: 1 };
+  const STORE = { v: 2, active: CHARACTERS[0].id, sound: true, profiles: {} };
+  let S = null;
+  let CH = CHARACTERS[0];
+  let D = { click: 1, cps: 0, crit: ECONOMY.baseCrit, critMult: ECONOMY.baseCritMult, glob: 1 };
 
   let combo = 0;
   let comboMult = 1;
@@ -133,25 +223,17 @@
   let nextGoldenAt = 0;
   let goldenHideTimer = 0;
   let nextUISync = 0;
+  let nextAchCheck = 0;
   let saveDirty = false;
   let hiddenAt = 0;
-  let nextAchCheck = 0;
-
-  const COMBO_WINDOW = 1600;
-  const COMBO_STEP = 0.035;
-  const COMBO_MAX = 60;
-  const FRENZY_MULT = 7;
-  const ACH_BONUS = 0.02;
-
-  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const coarsePointer = window.matchMedia('(pointer: coarse)').matches;
+  let switching = false;
 
   /* ---------------- dom ---------------- */
 
   const el = {
     stage: $('#stage'),
-    mimiBtn: $('#mimi-btn'),
-    mimiImg: $('#mimi-img'),
+    heroBtn: $('#hero-btn'),
+    heroImg: $('#hero-img'),
     fx: $('#fx'),
     speech: $('#speech'),
     golden: $('#golden'),
@@ -178,16 +260,28 @@
     resetBtn: $('#reset-btn'),
     shopList: $('#shop-list'),
     shopBadge: $('#shop-badge'),
+    shopTipImg: $('#shop-tip-img'),
+    shopTipText: $('#shop-tip-text'),
     modal: $('#modal'),
     modalBody: $('#modal-body'),
     toasts: $('#toasts'),
     soundBtn: $('#btn-sound'),
     soundIcon: $('#icon-sound use'),
     statsBtn: $('#btn-stats'),
+    profiles: $('#profiles'),
+    brandName: $('#brand-name'),
+    brandTagline: $('#brand-tagline'),
+    brandFace: $('#brand-face'),
+    heroHint: $('#hint-name'),
+    diaryTitle: $('#modal-title'),
+    favicon: $('#favicon'),
   };
 
   const cards = new Map();
   let squishAnim = null;
+
+  const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const coarsePointer = window.matchMedia('(pointer: coarse)').matches;
 
   /* ---------------- audio ---------------- */
 
@@ -284,15 +378,20 @@
   }
 
   function costOf(u, lvl = levelOf(u.id)) {
-    return Math.floor(u.cost * Math.pow(u.growth, lvl));
+    return Math.floor(u.base * Math.pow(u.growth, lvl));
+  }
+
+  function itemOf(u) {
+    const f = CH.flavor && CH.flavor[u.id];
+    return f ? Object.assign({}, u, f) : u;
   }
 
   function recalc() {
     let clickAdd = 0;
-    let cps = 0;
-    let crit = 0.05;
-    let critMult = 8;
-    let clickMul = 1;
+    let cpsAdd = 0;
+    let crit = ECONOMY.baseCrit;
+    let critMult = ECONOMY.baseCritMult;
+    let clickBonus = 0;
     let glob = 1;
 
     for (const u of UPGRADES) {
@@ -300,82 +399,105 @@
       if (!l) continue;
       switch (u.kind) {
         case 'clickAdd': clickAdd += u.value * l; break;
-        case 'cpsAdd': cps += u.value * l; break;
+        case 'cpsAdd': cpsAdd += u.value * l; break;
         case 'critAdd': crit += u.value * l; break;
         case 'critMul': critMult += u.value * l; break;
-        case 'clickMul': clickMul *= Math.pow(u.value, l); break;
+        case 'clickBonus': clickBonus += u.value * l; break;
         case 'globMul': glob *= Math.pow(u.value, l); break;
       }
     }
 
-    const achMult = 1 + ACH_BONUS * S.ach.length;
-    D.glob = glob * achMult;
-    D.click = (1 + clickAdd) * clickMul * D.glob;
-    D.cps = cps * D.glob;
-    D.crit = Math.min(0.75, crit);
+    glob *= 1 + ECONOMY.achBonus * S.ach.length;
+    D.glob = glob;
+    D.click = (1 + clickAdd) * (1 + clickBonus) * glob;
+    D.cps = cpsAdd * glob;
+    D.crit = Math.min(ECONOMY.critCap, crit);
     D.critMult = critMult;
   }
 
   function comboMultiplier() {
-    return 1 + Math.min(Math.max(combo - 1, 0), COMBO_MAX) * COMBO_STEP;
+    return 1 + Math.min(Math.max(combo - 1, 0), ECONOMY.comboMax) * ECONOMY.comboStep;
   }
 
-  /* ---------------- save / load ---------------- */
+  /* ---------------- persistence ---------------- */
+
+  function normalize(raw) {
+    const s = Object.assign(defaultState(), raw && typeof raw === 'object' ? raw : {});
+    s.bones = Math.max(0, Number(s.bones) || 0);
+    s.totalBones = Math.max(s.bones, Number(s.totalBones) || 0);
+    s.clicks = Math.max(0, Number(s.clicks) || 0);
+    s.crits = Math.max(0, Number(s.crits) || 0);
+    s.goldens = Math.max(0, Number(s.goldens) || 0);
+    s.bestCombo = Math.max(0, Number(s.bestCombo) || 0);
+    s.playMs = Math.max(0, Number(s.playMs) || 0);
+    s.frenzyUntil = 0;
+    s.lastSeen = Number(s.lastSeen) || Date.now();
+
+    const clean = {};
+    const src = raw && raw.levels && typeof raw.levels === 'object' ? raw.levels : {};
+    for (const u of UPGRADES) {
+      const l = Number(src[u.id]);
+      if (l > 0) clean[u.id] = clamp(Math.floor(l), 0, u.max || 9999);
+    }
+    s.levels = clean;
+    s.ach = Array.isArray(raw && raw.ach) ? raw.ach.filter((id) => ACHIEVEMENTS.some((a) => a.id === id)) : [];
+    return s;
+  }
 
   function save() {
-    S.lastSeen = Date.now();
+    if (S) S.lastSeen = Date.now();
+    STORE.v = 2;
     try {
-      localStorage.setItem(SAVE_KEY, JSON.stringify(S));
+      localStorage.setItem(SAVE_KEY, JSON.stringify(STORE));
       saveDirty = false;
     } catch { /* storage may be unavailable */ }
   }
 
   function load() {
-    let raw = null;
-    try { raw = localStorage.getItem(SAVE_KEY); } catch { return false; }
-    if (!raw) return false;
+    let data = null;
+    try { data = JSON.parse(localStorage.getItem(SAVE_KEY) || 'null'); } catch { data = null; }
 
-    let data;
-    try { data = JSON.parse(raw); } catch { return false; }
-    if (!data || typeof data !== 'object') return false;
-
-    S = Object.assign(defaultState(), data);
-    S.bones = Math.max(0, Number(S.bones) || 0);
-    S.totalBones = Math.max(S.bones, Number(S.totalBones) || 0);
-    S.clicks = Math.max(0, Number(S.clicks) || 0);
-    S.crits = Math.max(0, Number(S.crits) || 0);
-    S.goldens = Math.max(0, Number(S.goldens) || 0);
-    S.bestCombo = Math.max(0, Number(S.bestCombo) || 0);
-    S.playMs = Math.max(0, Number(S.playMs) || 0);
-    S.sound = data.sound !== false;
-    S.frenzyUntil = 0;
-
-    const clean = {};
-    if (data.levels && typeof data.levels === 'object') {
-      for (const u of UPGRADES) {
-        const l = Number(data.levels[u.id]);
-        if (l > 0) clean[u.id] = clamp(Math.floor(l), 0, u.max || 9999);
+    let loaded = false;
+    if (data && data.profiles && typeof data.profiles === 'object') {
+      STORE.sound = data.sound !== false;
+      STORE.active = characterById(data.active).id;
+      for (const c of CHARACTERS) STORE.profiles[c.id] = normalize(data.profiles[c.id]);
+      loaded = true;
+    } else {
+      let legacy = null;
+      try { legacy = JSON.parse(localStorage.getItem(LEGACY_KEY) || 'null'); } catch { legacy = null; }
+      if (legacy && typeof legacy === 'object') {
+        STORE.sound = legacy.sound !== false;
+        STORE.profiles[CHARACTERS[0].id] = normalize(legacy);
+        loaded = true;
       }
     }
-    S.levels = clean;
-    S.ach = Array.isArray(data.ach)
-      ? data.ach.filter((id) => ACHIEVEMENTS.some((a) => a.id === id))
-      : [];
-    return true;
+
+    for (const c of CHARACTERS) {
+      if (!STORE.profiles[c.id]) STORE.profiles[c.id] = defaultState();
+    }
+    if (!STORE.profiles[STORE.active]) STORE.active = CHARACTERS[0].id;
+    return loaded;
   }
 
-  function applyOffline() {
+  function applyOffline(profile) {
     const now = Date.now();
-    const elapsed = (now - (Number(S.lastSeen) || now)) / 1000;
+    const elapsed = (now - (Number(profile.lastSeen) || now)) / 1000;
+    let gained = 0;
+
     if (elapsed > 90 && D.cps > 0) {
-      const capped = Math.min(elapsed, 8 * 3600);
-      const gain = Math.floor(D.cps * capped * 0.7);
-      if (gain > 0) {
-        addBones(gain);
-        setTimeout(() => toast(`Пока тебя не было, Мими накопила <b>${fmt(gain)}</b> ${boneWord(gain)}`, '🌙'), 900);
+      const capped = Math.min(elapsed, ECONOMY.offlineCap);
+      gained = Math.floor(D.cps * capped * ECONOMY.offlineRate);
+      if (gained > 0) {
+        addBones(gained);
+        setTimeout(() => {
+          toast(`Пока тебя не было, <b>${CH.name}</b> накопила <b>${fmt(gained)}</b> ${boneWord(gained)}`, '🌙');
+        }, 900);
       }
     }
-    S.lastSeen = now;
+
+    profile.lastSeen = now;
+    return gained;
   }
 
   /* ---------------- money ---------------- */
@@ -398,7 +520,7 @@
   }
 
   function centerPoint() {
-    const r = el.mimiBtn.getBoundingClientRect();
+    const r = el.heroBtn.getBoundingClientRect();
     return { x: r.left + r.width / 2, y: r.top + r.height * 0.45 };
   }
 
@@ -468,7 +590,7 @@
   function squish() {
     if (reduceMotion) return;
     if (squishAnim) squishAnim.cancel();
-    squishAnim = el.mimiImg.animate(
+    squishAnim = el.heroImg.animate(
       [
         { transform: 'scale(1, 1) translateY(0)' },
         { transform: 'scale(1.07, 0.92) translateY(7px)', offset: 0.28 },
@@ -510,16 +632,16 @@
   /* ---------------- clicks ---------------- */
 
   function doClick(point) {
-    if (!el.modal.hidden) return;
+    if (!el.modal.hidden || switching) return;
 
     const now = performance.now();
-    if (now - lastClickAt > COMBO_WINDOW) combo = 0;
+    if (now - lastClickAt > ECONOMY.comboWindow) combo = 0;
     combo = Math.min(combo + 1, 200);
     lastClickAt = now;
     if (combo > S.bestCombo) S.bestCombo = combo;
     comboMult = comboMultiplier();
 
-    const frenzy = now < S.frenzyUntil ? FRENZY_MULT : 1;
+    const frenzy = now < S.frenzyUntil ? ECONOMY.frenzyMult : 1;
     const crit = Math.random() < D.crit;
     const gain = Math.max(1, Math.round(D.click * comboMult * frenzy * (crit ? D.critMult : 1)));
 
@@ -538,14 +660,14 @@
       flash(point.x, point.y);
       shakeStage();
       vibrate(18);
-      if (Math.random() < 0.22) say(pick(['Крит! 💥', 'Кусь!', 'Вот это удар!']), true);
+      if (Math.random() < 0.22) say(pick(CH.crit), true);
     } else {
       Sfx.click();
       vibrate(6);
-      if (Math.random() < 0.09) say(pick(SPEECH));
+      if (Math.random() < 0.09) say(pick(CH.speech));
     }
 
-    if (combo > 0 && combo % 25 === 0) say(`Комбо ×${comboMult.toFixed(1).replace('.', ',')}! 🔥`, true);
+    if (combo > 0 && combo % 25 === 0) say(CH.comboLine(comboMult.toFixed(1).replace('.', ',')), true);
 
     checkAchievements();
     updateShop();
@@ -588,15 +710,15 @@
 
     const frenzy = Math.random() < 0.5;
     if (frenzy) {
-      S.frenzyUntil = performance.now() + 15000;
-      say('Безумие! ×7 на 15 секунд! ⚡', true);
+      S.frenzyUntil = performance.now() + ECONOMY.frenzyMs;
+      say(CH.frenzySay, true);
       toast('Золотая косточка: <b>×7 к клику</b> на 15 секунд!', '⚡');
       Sfx.ach();
     } else {
       const reward = Math.max(60, Math.round(Math.max(D.cps * 45, D.click * 35, 50)));
       addBones(reward);
       spawnFloat(gx + 37, gy + 37, fmt(reward), true);
-      say('Целое сокровище! 💛', true);
+      say(CH.goldenWin, true);
       toast(`Золотая косточка: <b>+${fmt(reward)}</b> ${boneWord(reward)}!`, '🦴');
       Sfx.gold();
     }
@@ -617,7 +739,7 @@
       if (!ok) continue;
       S.ach.push(a.id);
       Sfx.ach();
-      toast(`Достижение: <b>${a.name}</b><br><span style="color:#b79f90;font-weight:600">${a.desc}</span> · +${Math.round(ACH_BONUS * 100)}% к доходу`, a.icon);
+      toast(`Достижение: <b>${a.name}</b><br><span style="color:var(--dim);font-weight:600">${a.desc}</span> · +${Math.round(ECONOMY.achBonus * 100)}% к доходу`, a.icon);
       say('Новое достижение! 🏆', true);
       recalc();
       saveDirty = true;
@@ -628,16 +750,18 @@
 
   function buildShop() {
     el.shopList.innerHTML = '';
+    cards.clear();
     for (const u of UPGRADES) {
+      const it = itemOf(u);
       const card = document.createElement('button');
       card.type = 'button';
       card.className = 'card';
       card.dataset.id = u.id;
       card.innerHTML = `
-        <span class="card__icon" style="--tint:${u.tint}" aria-hidden="true">${u.icon}</span>
+        <span class="card__icon" style="--tint:${it.tint}" aria-hidden="true">${it.icon}</span>
         <span class="card__body">
-          <span class="card__name">${u.name}<span class="card__lvl">новое</span></span>
-          <span class="card__desc">${u.desc}</span>
+          <span class="card__name">${it.name}<span class="card__lvl">новое</span></span>
+          <span class="card__desc">${it.desc}</span>
         </span>
         <span class="card__cost"><svg class="icon" aria-hidden="true"><use href="#i-bone"/></svg><span class="card__cost-num">0</span></span>
       `;
@@ -647,7 +771,6 @@
         lvl: $('.card__lvl', card),
         cost: $('.card__cost-num', card),
         desc: $('.card__desc', card),
-        name: $('.card__name', card),
       });
     }
   }
@@ -655,6 +778,7 @@
   function updateCard(u) {
     const refs = cards.get(u.id);
     if (!refs) return;
+    const it = itemOf(u);
     const lvl = levelOf(u.id);
     const maxed = !!u.max && lvl >= u.max;
     const cost = costOf(u, lvl);
@@ -666,8 +790,8 @@
     refs.root.classList.toggle('is-locked', !afford && !maxed);
     refs.root.classList.toggle('is-maxed', maxed);
     refs.root.setAttribute('aria-label', maxed
-      ? `${u.name}: максимальный уровень`
-      : `${u.name}. ${u.desc}. Уровень ${lvl}. Стоимость ${fmt(cost)} косточек`);
+      ? `${it.name}: максимальный уровень`
+      : `${it.name}. ${it.desc}. Уровень ${lvl}. Стоимость ${fmt(cost)} косточек`);
   }
 
   function updateShop() {
@@ -684,7 +808,7 @@
 
   function buy(id) {
     const u = UPGRADES.find((x) => x.id === id);
-    if (!u) return;
+    if (!u || switching) return;
     const lvl = levelOf(u.id);
     if (u.max && lvl >= u.max) return;
 
@@ -715,7 +839,7 @@
     Sfx.buy();
     updateShop();
     updateStatsUI(true);
-    if (Math.random() < 0.32) say(pick(BUY_SPEECH), true);
+    if (Math.random() < 0.32) say(pick(CH.buy), true);
     checkAchievements();
     saveDirty = true;
     save();
@@ -740,24 +864,25 @@
     }
 
     const { u, cost } = target;
+    const it = itemOf(u);
     const ready = S.bones >= cost;
-    setText(el.goalIcon, u.icon);
-    setText(el.goalName, u.name);
+    setText(el.goalIcon, it.icon);
+    setText(el.goalName, it.name);
     setText(el.goalProgress, ready ? 'покупай!' : `${fmt(Math.min(S.bones, cost))} / ${fmt(cost)}`);
     el.goalFill.style.width = clamp((S.bones / cost) * 100, 0, 100).toFixed(1) + '%';
     el.goal.classList.toggle('is-ready', ready);
   }
 
-  function updateStatsUI(force = false) {
+  function updateStatsUI() {
     setText(el.rate, fmtRate(D.cps));
     setText(el.perClick, fmt(Math.round(D.click)));
     setText(el.critChance, `${Math.round(D.crit * 100)}%`);
     setText(el.critMult, `×${D.critMult}`);
     setText(el.multiplier, `×${D.glob.toFixed(2).replace('.', ',')}`);
     setText(el.achCount, `${S.ach.length}/${ACHIEVEMENTS.length}`);
-    setText(el.achBonus, `+${Math.round(S.ach.length * ACH_BONUS * 100)}%`);
+    setText(el.achBonus, `+${Math.round(S.ach.length * ECONOMY.achBonus * 100)}%`);
 
-    const pct = clamp((combo / COMBO_MAX) * 100, 0, 100);
+    const pct = clamp((combo / ECONOMY.comboMax) * 100, 0, 100);
     el.comboFill.style.width = pct.toFixed(1) + '%';
     setText(el.comboMult, `×${comboMult.toFixed(1).replace('.', ',')}`);
     el.comboBox.classList.toggle('is-hot', combo >= 15);
@@ -785,10 +910,84 @@
 
   function updateSoundBtn() {
     if (!el.soundBtn) return;
-    el.soundBtn.setAttribute('aria-pressed', String(S.sound));
-    el.soundBtn.setAttribute('aria-label', S.sound ? 'Звук: включён' : 'Звук: выключен');
-    el.soundBtn.classList.toggle('is-off', !S.sound);
-    if (el.soundIcon) el.soundIcon.setAttribute('href', S.sound ? '#i-volume' : '#i-muted');
+    el.soundBtn.setAttribute('aria-pressed', String(STORE.sound));
+    el.soundBtn.setAttribute('aria-label', STORE.sound ? 'Звук: включён' : 'Звук: выключен');
+    el.soundBtn.classList.toggle('is-off', !STORE.sound);
+    if (el.soundIcon) el.soundIcon.setAttribute('href', STORE.sound ? '#i-volume' : '#i-muted');
+  }
+
+  /* ---------------- profiles ---------------- */
+
+  function renderProfiles() {
+    if (!el.profiles) return;
+    el.profiles.querySelectorAll('.profile').forEach((btn) => {
+      const on = btn.dataset.char === STORE.active;
+      btn.classList.toggle('is-active', on);
+      btn.setAttribute('aria-selected', String(on));
+      btn.tabIndex = on ? 0 : -1;
+    });
+  }
+
+  function applyCharacter(c) {
+    document.documentElement.dataset.theme = c.id;
+    document.title = `${c.brand} — ${c.tagline}`;
+    const metaTheme = document.querySelector('meta[name="theme-color"]');
+    if (metaTheme) metaTheme.setAttribute('content', c.themeColor);
+    setText(el.brandName, c.brand);
+    setText(el.brandTagline, c.tagline);
+    setText(el.diaryTitle, c.diary);
+    setText(el.heroHint, c.dative);
+    el.heroBtn.setAttribute('aria-label', c.pet);
+    el.stage.setAttribute('aria-label', `Сцена: ${c.name}`);
+
+    if (el.brandFace.getAttribute('src') !== c.face) el.brandFace.src = c.face;
+    if (el.heroImg.getAttribute('src') !== c.hero) {
+      el.heroImg.src = c.hero;
+      el.heroImg.alt = c.alt;
+    }
+    if (el.shopTipImg.getAttribute('src') !== c.chibi) el.shopTipImg.src = c.chibi;
+    el.shopTipText.innerHTML = c.tip;
+    if (el.favicon && el.favicon.getAttribute('href') !== c.favicon) el.favicon.href = c.favicon;
+
+    buildShop();
+    renderProfiles();
+    updateGoal();
+  }
+
+  function resetRuntime() {
+    combo = 0;
+    comboMult = 1;
+    lastClickAt = -1e9;
+    S.frenzyUntil = 0;
+    goldenActive = false;
+    clearTimeout(goldenHideTimer);
+    el.golden.hidden = true;
+    el.speech.classList.remove('is-on');
+  }
+
+  function switchProfile(id) {
+    if (switching || id === STORE.active || !STORE.profiles[id]) return;
+    switching = true;
+    save();
+    el.stage.classList.add('is-switching');
+
+    setTimeout(() => {
+      STORE.active = id;
+      S = STORE.profiles[id];
+      CH = characterById(id);
+      resetRuntime();
+      recalc();
+      applyCharacter(CH);
+      applyOffline(S);
+      displayBones = S.bones;
+      updateShop();
+      updateStatsUI();
+      el.stage.classList.remove('is-switching');
+      toast(`Профиль: <b>${CH.name}</b>`, CH.badgeIcon);
+      scheduleGolden(rand(35, 70) * 1000);
+      save();
+      switching = false;
+    }, 190);
   }
 
   /* ---------------- modal ---------------- */
@@ -853,34 +1052,31 @@
 
   function closeModal() {
     el.modal.hidden = true;
-    el.mimiBtn.focus({ preventScroll: true });
+    el.heroBtn.focus({ preventScroll: true });
   }
 
   function resetGame() {
-    try { localStorage.removeItem(SAVE_KEY); } catch { /* ignore */ }
+    const name = CH.name;
+    try {
+      localStorage.removeItem(SAVE_KEY);
+      localStorage.removeItem(LEGACY_KEY);
+    } catch { /* ignore */ }
+
     S = defaultState();
-    combo = 0;
-    comboMult = 1;
-    lastClickAt = -1e9;
+    STORE.profiles[STORE.active] = S;
+    resetRuntime();
     displayBones = 0;
-    goldenActive = false;
-    nextGoldenAt = 0;
-    el.golden.hidden = true;
-    clearTimeout(goldenHideTimer);
     resetArmed = 0;
     if (el.resetBtn) {
       el.resetBtn.classList.remove('is-armed');
       el.resetBtn.textContent = 'Сбросить прогресс';
     }
     recalc();
-    Sfx.on = S.sound;
-    Sfx.setEnabled(S.sound);
-    updateSoundBtn();
     updateShop();
-    updateStatsUI(true);
+    updateStatsUI();
     renderModal();
     closeModal();
-    toast('Прогресс сброшен. Мими начинает заново 🐾', '🔄');
+    toast(`Прогресс <b>${name}</b> сброшен. Начинаем заново 🐾`, '🔄');
     scheduleGolden(20000);
     save();
   }
@@ -894,7 +1090,7 @@
     if (D.cps > 0) addBones(D.cps * dt);
     S.playMs += dt * 1000;
 
-    if (combo > 0 && now - lastClickAt > COMBO_WINDOW) {
+    if (combo > 0 && now - lastClickAt > ECONOMY.comboWindow) {
       combo = Math.max(0, combo - dt * 36);
       comboMult = comboMultiplier();
     }
@@ -923,14 +1119,14 @@
   /* ---------------- events ---------------- */
 
   function bindEvents() {
-    el.mimiBtn.addEventListener('pointerdown', (e) => {
+    el.heroBtn.addEventListener('pointerdown', (e) => {
       if (e.pointerType === 'mouse' && e.button !== 0) return;
       Sfx.ensure();
       doClick({ x: e.clientX, y: e.clientY });
     });
 
-    el.mimiBtn.addEventListener('click', (e) => {
-      // keyboard activation fallback (Enter / Space) — pointer clicks are handled above
+    el.heroBtn.addEventListener('click', (e) => {
+      // keyboard activation fallback (Enter / Space)
       if (e.detail === 0) doClick(centerPoint());
     });
 
@@ -946,12 +1142,32 @@
       buy(card.dataset.id);
     });
 
+    el.profiles.addEventListener('click', (e) => {
+      const btn = e.target.closest('.profile');
+      if (btn && btn.dataset.char) switchProfile(btn.dataset.char);
+    });
+
+    el.profiles.addEventListener('keydown', (e) => {
+      if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+      e.preventDefault();
+      const idx = CHARACTERS.findIndex((c) => c.id === STORE.active);
+      const dir = e.key === 'ArrowRight' ? 1 : CHARACTERS.length - 1;
+      const next = CHARACTERS[(idx + dir) % CHARACTERS.length];
+      if (next) {
+        switchProfile(next.id);
+        setTimeout(() => {
+          const tab = el.profiles.querySelector(`[data-char="${STORE.active}"]`);
+          if (tab) tab.focus({ preventScroll: true });
+        }, 260);
+      }
+    });
+
     el.soundBtn.addEventListener('click', () => {
-      S.sound = !S.sound;
-      Sfx.setEnabled(S.sound);
+      STORE.sound = !STORE.sound;
+      Sfx.setEnabled(STORE.sound);
       updateSoundBtn();
-      if (S.sound) Sfx.click();
-      toast(S.sound ? 'Звук включён' : 'Звук выключен', S.sound ? '🔊' : '🔇');
+      if (STORE.sound) Sfx.click();
+      toast(STORE.sound ? 'Звук включён' : 'Звук выключен', STORE.sound ? '🔊' : '🔇');
       save();
     });
 
@@ -970,13 +1186,13 @@
       if (e.key === 'Escape') return;
 
       const target = e.target;
-      const isMimi = target === el.mimiBtn;
+      const isHero = target === el.heroBtn;
       const onControl = target instanceof Element &&
-        target.closest('button, a, input, textarea, select') && !isMimi;
+        target.closest('button, a, input, textarea, select') && !isHero;
 
       if (onControl) return;
 
-      if (e.key === 'Enter' && isMimi) {
+      if (e.key === 'Enter' && isHero) {
         e.preventDefault();
         Sfx.ensure();
         doClick(centerPoint());
@@ -1007,7 +1223,7 @@
           const gain = Math.floor(D.cps * secs * 0.85);
           if (gain > 0) {
             addBones(gain);
-            toast(`Мими накопила <b>${fmt(gain)}</b> ${boneWord(gain)}, пока тебя не было`, '🌙');
+            toast(`<b>${CH.name}</b> накопила <b>${fmt(gain)}</b> ${boneWord(gain)}, пока тебя не было`, '🌙');
           }
         }
         hiddenAt = 0;
@@ -1020,25 +1236,28 @@
 
   function init() {
     const loaded = load();
+    S = STORE.profiles[STORE.active];
+    CH = characterById(STORE.active);
     recalc();
     displayBones = S.bones;
     lastFrame = 0;
 
-    buildShop();
+    applyCharacter(CH);
     bindEvents();
     bindResetButton();
+    Sfx.on = STORE.sound;
     updateSoundBtn();
-    Sfx.on = S.sound;
 
-    if (loaded) applyOffline();
+    if (loaded) applyOffline(S);
     recalc();
     checkAchievements();
     updateShop();
-    updateStatsUI(true);
+    updateStatsUI();
+    save();
     scheduleGolden(22000);
 
     requestAnimationFrame(frame);
-    setTimeout(() => say(loaded ? 'С возвращением! 🐾' : 'Привет! Погладь меня 🐾', true), 700);
+    setTimeout(() => say(loaded ? CH.welcomeBack : CH.welcome, true), 700);
     setInterval(() => { if (saveDirty) save(); }, 5000);
   }
 

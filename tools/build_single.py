@@ -37,9 +37,11 @@ game_js = read(os.path.join(ROOT, "game.js"))
 html = read(os.path.join(ROOT, "index.html"))
 
 html = html.replace('<link rel="preload" as="image" href="assets/mimi-hero.webp">\n', "")
-html = html.replace(
-    '<link rel="icon" href="assets/favicon.png" type="image/png">',
-    f'<link rel="icon" href="{data_uri(os.path.join(ROOT, "assets", "favicon.png"))}" type="image/png">',
+html = re.sub(
+    r'<link rel="icon"[^>]*>',
+    f'<link rel="icon" id="favicon" href="{data_uri(os.path.join(ROOT, "assets", "favicon.png"))}" type="image/png">',
+    html,
+    count=1,
 )
 html = html.replace('<link rel="stylesheet" href="fonts.css">', "<style>\n" + fonts_css + "\n</style>")
 html = html.replace('<link rel="stylesheet" href="style.css">', "<style>\n" + style_css + "\n</style>")
@@ -50,6 +52,15 @@ def img_repl(match):
 
 
 html = re.sub(r'src="(assets/[^"]+)"', img_repl, html)
+
+
+# character art paths live in JS as string literals — inline them too
+def js_asset_repl(match):
+    quote, path = match.group(1), match.group(2)
+    return quote + data_uri(os.path.join(ROOT, path)) + quote
+
+
+game_js = re.sub(r"(['\"])(assets/[^'\"]+)\1", js_asset_repl, game_js)
 
 html = html.replace(
     '<script src="game.js"></script>',

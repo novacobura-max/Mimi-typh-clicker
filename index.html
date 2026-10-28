@@ -1,13 +1,13 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html lang="ru" data-theme="mimi">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Mimi Clicker — косточковая ферма</title>
-<meta name="description" content="Милый кликер про Мими: гладь её, собирай косточки и открывай улучшения.">
+<meta name="description" content="Милый кликер с двумя персонажами: гладь, собирай косточки и открывай улучшения.">
 <meta name="theme-color" content="#1a100d">
 <meta name="color-scheme" content="dark">
-<link rel="icon" href="assets/favicon.png" type="image/png">
+<link rel="icon" id="favicon" href="assets/favicon.png" type="image/png">
 <link rel="preload" as="image" href="assets/mimi-hero.webp">
 <link rel="stylesheet" href="fonts.css">
 <link rel="stylesheet" href="style.css">
@@ -72,17 +72,28 @@
   </symbol>
 </svg>
 
-<div class="app">
+<div class="app" id="app">
 
   <header class="topbar">
     <div class="brand">
       <span class="brand__badge">
-        <img src="assets/mimi-bust.webp" alt="" width="96" height="96" decoding="async">
+        <img id="brand-face" src="assets/mimi-face.webp" alt="" width="96" height="96" decoding="async">
       </span>
       <div class="brand__text">
-        <h1>Mimi Clicker</h1>
-        <p>косточковая ферма</p>
+        <h1 id="brand-name">Mimi Clicker</h1>
+        <p id="brand-tagline">косточковая ферма</p>
       </div>
+    </div>
+
+    <div class="profiles" id="profiles" role="tablist" aria-label="Персонажи">
+      <button class="profile is-active" type="button" role="tab" data-char="mimi" aria-selected="true" aria-controls="stage" title="Мими — косточковая ферма">
+        <span class="profile__pic"><img src="assets/mimi-face.webp" alt="" width="64" height="64" decoding="async"></span>
+        <span class="profile__meta">Мими</span>
+      </button>
+      <button class="profile" type="button" role="tab" data-char="lapa" aria-selected="false" aria-controls="stage" title="Лапа — дворовая банда">
+        <span class="profile__pic"><img src="assets/lapa-face.webp" alt="" width="64" height="64" decoding="async"></span>
+        <span class="profile__meta">Лапа</span>
+      </button>
     </div>
 
     <div class="topbar__actions">
@@ -162,7 +173,7 @@
       </div>
     </section>
 
-    <section class="stage" id="stage" aria-label="Мими">
+    <section class="stage" id="stage" aria-label="Сцена с Мими">
       <div class="deco" aria-hidden="true">
         <svg class="deco__item" style="--x:9%;--dur:22s;--delay:-3s;--size:20px"><use href="#i-heart"/></svg>
         <svg class="deco__item" style="--x:21%;--dur:27s;--delay:-14s;--size:14px"><use href="#i-bone"/></svg>
@@ -175,9 +186,9 @@
       <div class="stage__orbit" aria-hidden="true"></div>
       <div class="stage__floor" aria-hidden="true"></div>
 
-      <button class="mimi" id="mimi-btn" type="button" aria-label="Погладить Мими и получить косточку">
-        <span class="mimi__bob">
-          <img class="mimi__img" id="mimi-img" src="assets/mimi-hero.webp" width="458" height="1000"
+      <button class="hero" id="hero-btn" type="button" aria-label="Погладить Мими и получить косточку">
+        <span class="hero__bob">
+          <img class="hero__img" id="hero-img" src="assets/mimi-hero.webp" width="458" height="1000"
                alt="Мими — милая собачка-девочка с шоколадными волосами в белой футболке" draggable="false">
         </span>
       </button>
@@ -192,7 +203,7 @@
 
       <p class="stage__hint">
         <span class="hint--desktop"><kbd>Пробел</kbd> или клик — погладить</span>
-        <span class="hint--touch">Тапни по Мими, чтобы погладить</span>
+        <span class="hint--touch">Тапни по <b id="hint-name">Мими</b>, чтобы погладить</span>
       </p>
     </section>
 
@@ -203,8 +214,8 @@
       </div>
       <div class="shop__list" id="shop-list"></div>
       <div class="shop__tip">
-        <img src="assets/mimi-chibi.webp" alt="" width="64" height="65" loading="lazy" decoding="async">
-        <p>Совет: держи серию кликов — комбо даёт до <b>×3</b> косточек.</p>
+        <img id="shop-tip-img" src="assets/mimi-chibi.webp" alt="" width="64" height="65" loading="lazy" decoding="async">
+        <p id="shop-tip-text">Совет: держи серию кликов — комбо даёт до <b>×3</b> косточек.</p>
       </div>
     </section>
 
